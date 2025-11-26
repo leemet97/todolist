@@ -2,7 +2,11 @@
   "expo": {
     "name": "todo",
     "slug": "todo",
-    "platforms": ["ios", "android","web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -21,10 +25,17 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.leejinseon.todo"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e53a1ad3-d134-45ff-9a72-725636be7000"
+      }
+    },
+    "owner": "leejinseon"
   }
 }

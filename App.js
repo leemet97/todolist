@@ -11,16 +11,17 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
-//설치해야함:npx expo install expo-image-picker
 
 export default function App() {
   const [text, setText] = useState("");
   const [todos, setTodos] = useState([]);
-  const [date, setDate] = useState(new Date()); //현재날씨 기초값
-  const [showPicker, setShowPicker] = useState(false); //날짜 피커보여주기
+  const [date, setDate] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false);
   const [photo, setPhoto] = useState(null);
 
-  //날짜 형식 만들기
+  const [editingId, setEditingId] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+
   const formatDate = (d) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -28,46 +29,54 @@ export default function App() {
     return `${y}-${m}-${day}`;
   };
 
-  // 카메라 촬영
+  const startEdit = (item) => {
+    setEditingId(item.id);
+    setText(item.title);
+    setDate(new Date(item.date));
+    setPhoto(item.photos || null);
+    setIsEditing(true);
+  };
+
+  const saveEdit = () => {
+    setTodos(
+      todos.map((todo) =>
+        todo.id === editingId
+          ? { ...todo, title: text, date: formatDate(date), photos: photo }
+          : todo
+      )
+    );
+    setEditingId(null);
+    setIsEditing(false);
+    setText("");
+    setPhoto(null);
+  };
+
   const getPhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       alert("카메라 권한이 필요합니다.");
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       quality: 0.8,
     });
-
-    if (result.canceled) return;
-
-    const uri = result.assets[0].uri;
-
-    setPhoto(uri);
+    if (!result.canceled) setPhoto(result.assets[0].uri);
   };
 
-  // 갤러리에서 선택
   const getGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       alert("갤러리 접근 권한이 필요합니다.");
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
       quality: 0.8,
     });
-
-    if (result.canceled) return;
-
-    const uri = result.assets[0].uri;
-    setPhoto(uri);
+    if (!result.canceled) setPhoto(result.assets[0].uri);
   };
 
-  // Todo 추가
   const addTodo = () => {
     if (!text.trim()) return;
 
@@ -77,49 +86,29 @@ export default function App() {
       date: formatDate(date),
       photos: photo,
     };
-
     setTodos([newTodo, ...todos]);
     setText("");
     setPhoto(null);
   };
-  // Todo 삭제
+
   const removetodo = (id) => {
     setTodos(todos.filter((item) => item.id !== id));
   };
-  //날짜 변경
+
   const changeDate = (e, chDate) => {
-    if (Platform.OS === "android") {
-      setShowPicker(false);
-    }
-    if (chDate) {
-      setDate(chDate);
-    }
+    if (Platform.OS === "android") setShowPicker(false);
+    if (chDate) setDate(chDate);
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Todo List</Text>
 
-      {/* 날짜 선택 */}
-      <Pressable onPress={() => setShowPicker(true)}>
-        <Text style={styles.dateDisplay}>{formatDate(date)}</Text>
+      {/* 날짜 */}
+      <Pressable onPress={() => setShowPicker(true)} style={styles.dateBox}>
+        <Text style={styles.dateText}>{formatDate(date)}</Text>
       </Pressable>
 
-      {/* 입력 + 추가 버튼 */}
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="할 일을 입력하세요"
-          value={text}
-          onChangeText={setText}
-        />
-
-        <Pressable style={styles.addBtn} onPress={addTodo}>
-          <Text style={styles.addBtnText}>추가</Text>
-        </Pressable>
-      </View>
-
-      {/* 날짜 선택 박스 */}
       {showPicker && (
         <DateTimePicker
           value={date}
@@ -129,66 +118,92 @@ export default function App() {
         />
       )}
 
-      {/* 카메라/갤러리 버튼 */}
-      <View style={{ marginTop: 20, alignItems: "center" }}>
-        <Text style={{ fontSize: 16, marginBottom: 10 }}>사진 선택하기</Text>
+      {/* 입력 */}
+      <TextInput
+        style={styles.input}
+        placeholder="할 일을 입력하세요"
+        value={text}
+        onChangeText={setText}
+      />
 
-        <View style={styles.photoButtonRow}>
-          <Pressable style={styles.cameraButton} onPress={getPhoto}>
-            <Text style={styles.photoButtonText}> 카메라</Text>
-          </Pressable>
+      {/* 사진 선택 */}
+      <View style={styles.photoRow}>
+        <Text style={styles.photoLabel}>사진 선택하기:</Text>
 
-          <Pressable style={styles.photoButton} onPress={getGallery}>
-            <Text style={styles.photoButtonText}> 갤러리</Text>
-          </Pressable>
-        </View>
+        <Pressable style={styles.photoButton} onPress={getPhoto}>
+          <Text style={styles.photoButtonText}>카메라</Text>
+        </Pressable>
+
+        <Pressable style={styles.photoButton} onPress={getGallery}>
+          <Text style={styles.photoButtonText}>갤러리</Text>
+        </Pressable>
       </View>
 
-      {/* 사진 미리보기 */}
+      {/* 미리보기 */}
       <View style={styles.previewBox}>
         {photo && (
           <Image
             source={{ uri: photo }}
-            style={{ width: 120, height: 120, marginTop: 10, borderRadius: 10 }}
+            style={{ width: 120, height: 120, borderRadius: 10 }}
           />
         )}
       </View>
 
-      {/* Todo 리스트 */}
-      <FlatList
-        data={todos}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>할 일이 없습니다.</Text>
-        }
-        renderItem={({ item, index }) => (
-          <Pressable
-            onLongPress={() => removetodo(item.id)}
-            style={styles.todoItem}
-          >
-            <Text style={styles.todoIndex}>{index + 1}.</Text>
+      {/* 추가 버튼 */}
+      <Pressable style={styles.addBtn} onPress={isEditing ? saveEdit : addTodo}>
+        <Text style={styles.addBtnText}>{isEditing ? "저장" : "추가하기"}</Text>
+      </Pressable>
 
-            <View style={{ flex: 1 }}>
-              <Text style={styles.todoText}>{item.title}</Text>
-              <Text style={styles.todoDate}>{item.date}</Text>
+      {/* 리스트 */}
+      <View style={styles.listBox}>
+        <FlatList
+          data={todos}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>할 일이 없습니다.</Text>
+          }
+          renderItem={({ item, index }) => (
+            <View style={styles.todoCard}>
+              {/* 번호 + 제목 */}
+              <View style={styles.titleRow}>
+                <Text style={styles.todoIndex}>{index + 1}.</Text>
+                <Text style={styles.todoText}>{item.title}</Text>
+              </View>
+
+              {/* 날짜 + 수정 삭제 */}
+              <View style={styles.todoTopRow}>
+                <Text style={styles.todoDate}>{item.date}</Text>
+
+                <View style={styles.actionRow}>
+                  <Pressable
+                    onPress={() => startEdit(item)}
+                    style={styles.editBtn}
+                  >
+                    <Text style={styles.editText}>수정</Text>
+                  </Pressable>
+
+                  <Pressable onPress={() => removetodo(item.id)}>
+                    <Text style={styles.deleteText}>삭제</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* 사진 */}
+              {item.photos && (
+                <Image
+                  source={{ uri: item.photos }}
+                  style={{
+                    width: "100%",
+                    height: 90,
+                    borderRadius: 10,
+                    marginTop: 10,
+                  }}
+                />
+              )}
             </View>
-
-            {item.photos && (
-              <Image
-                source={{ uri: item.photos }}
-                style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 8,
-                  marginLeft: 10,
-                }}
-              />
-            )}
-
-            <Text style={styles.deleteHint}>삭제</Text>
-          </Pressable>
-        )}
-      />
+          )}
+        />
+      </View>
     </View>
   );
 }
@@ -204,114 +219,144 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    marginBottom: 30,
-    color: "#333",
-  },
-
-  dateDisplay: {
-    fontSize: 18,
-    marginBottom: 15,
-    left: 0,
-  },
-
-  inputRow: {
-    flexDirection: "row",
     marginBottom: 20,
-    paddingHorizontal: 10,
-    alignItems: "center",
+  },
+
+  dateBox: {
+    alignSelf: "flex-start",
+    marginLeft: 20,
+    marginBottom: 10,
+  },
+
+  dateText: {
+    fontSize: 18,
   },
 
   input: {
-    width: 250,
+    width: "90%",
     padding: 12,
+    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#383737ff",
     borderRadius: 10,
-    backgroundColor: "#fcf5f5ff",
-    marginRight: 10,
+    marginBottom: 10,
   },
-
-  addBtn: {
-    backgroundColor: "#4da6ff",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    justifyContent: "center",
+  photoRow: {
+    flexDirection: "row",
     alignItems: "center",
+    width: "70%",
+    justifyContent: "space-between",
+    marginTop: 1,
+    marginBottom: 1,
   },
 
-  addBtnText: {
-    color: "white",
-    fontWeight: "bold",
+  photoLabel: {
+    fontSize: 16,
   },
+
   photoButtonRow: {
     flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 20,
+    gap: 10,
     marginTop: 10,
+    marginBottom: 0,
   },
-  cameraButton: {
-    backgroundColor: "#c4e8f7ff",
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#ccc",
-  },
+
   photoButton: {
-    backgroundColor: "#fdeaeaff",
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 18,
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ccc",
+    backgroundColor: "#fff",
   },
+
   photoButtonText: {
     fontSize: 15,
     fontWeight: "600",
   },
-  emptyText: {
-    marginTop: 40,
-    color: "#757272ff",
-    fontSize: 19,
+
+  previewBox: {
+    marginVertical: 5,
   },
 
-  todoItem: {
-    width: 300,
-    padding: 16,
-    marginVertical: 6,
+  addBtn: {
+    backgroundColor: "#4da6ff",
+    paddingVertical: 14,
+    width: "90%",
+    alignItems: "center",
     borderRadius: 12,
-    backgroundColor: "#e2f1d5ff",
+    marginBottom: 5,
+  },
+
+  addBtnText: {
+    color: "white",
+    fontSize: 22,
+    fontWeight: "bold",
+  },
+
+  listBox: {
+    width: "100%",
+    paddingHorizontal: 10,
+    marginBottom: 40,
+  },
+
+  todoCard: {
+    width: "100%",
+    backgroundColor: "#e8f4d9",
+    marginVertical: 8,
+    padding: 16,
+    borderRadius: 14,
+  },
+
+  titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
+    marginBottom: 6,
   },
 
   todoIndex: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
-    marginRight: 10,
+    marginRight: 6,
   },
 
   todoText: {
-    flex: 1,
-    fontSize: 16,
+    fontSize: 18,
   },
+
   todoDate: {
-    fontSize: 12,
-    color: "#666",
-    backgroundColor: "#d4e49dff",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginLeft: 10,
+    fontSize: 16,
+    color: "#555",
   },
-  deleteHint: {
-    fontSize: 12,
-    color: "#302d2dff",
+
+  todoTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 5,
+  },
+
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  editBtn: {
+    marginRight: 15,
+  },
+
+  editText: {
+    color: "blue",
+    fontSize: 18,
+  },
+
+  deleteText: {
+    color: "red",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+
+  emptyText: {
+    marginTop: 30,
+    fontSize: 20,
+    color: "#666",
+    textAlign: "center",
   },
 });
