@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -8,11 +8,14 @@ import {
   Pressable,
   Image,
   Platform,
+  Animated,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 
 export default function App() {
+  const scale = useRef(new Animated.Value(0)).current;
+  const flash = useRef(new Animated.Value(1)).current;
   const [text, setText] = useState("");
   const [todos, setTodos] = useState([]);
   const [date, setDate] = useState(new Date());
@@ -35,9 +38,33 @@ export default function App() {
     setDate(new Date(item.date));
     setPhoto(item.photos || null);
     setIsEditing(true);
+    scale.setValue(0);
+    Animated.spring(scale, {
+      toValue: 1,
+      friction: 4,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+    flash.setValue(1);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(flash, {
+          toValue: 0.5,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(flash, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   };
 
   const saveEdit = () => {
+    flash.stopAnimation();
+    flash.setValue(1);
     setTodos(
       todos.map((todo) =>
         todo.id === editingId
@@ -78,6 +105,8 @@ export default function App() {
   };
 
   const addTodo = () => {
+    flash.stopAnimation();
+    flash.setValue(1);
     if (!text.trim()) return;
 
     const newTodo = {
@@ -142,17 +171,32 @@ export default function App() {
       {/* 미리보기 */}
       <View style={styles.previewBox}>
         {photo && (
-          <Image
-            source={{ uri: photo }}
-            style={{ width: 120, height: 120, borderRadius: 10 }}
-          />
+          <Animated.View style={{ opacity: flash }}>
+            <Image
+              source={{ uri: photo }}
+              style={{ width: 120, height: 120, borderRadius: 10 }}
+            />
+          </Animated.View>
         )}
       </View>
 
       {/* 추가 버튼 */}
-      <Pressable style={styles.addBtn} onPress={isEditing ? saveEdit : addTodo}>
-        <Text style={styles.addBtnText}>{isEditing ? "저장" : "추가하기"}</Text>
-      </Pressable>
+      <Animated.View
+        style={{
+          opacity: flash,
+          width: "90%",
+          alignItems: "center",
+        }}
+      >
+        <Pressable
+          style={styles.addBtn}
+          onPress={isEditing ? saveEdit : addTodo}
+        >
+          <Text style={styles.addBtnText}>
+            {isEditing ? "수정 후 저장하기 " : "추가하기"}
+          </Text>
+        </Pressable>
+      </Animated.View>
 
       {/* 리스트 */}
       <View style={styles.listBox}>
