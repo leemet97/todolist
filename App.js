@@ -9,13 +9,15 @@ import {
   Image,
   Platform,
   Animated,
+  Modal,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 
 export default function App() {
-  const scale = useRef(new Animated.Value(0)).current;
-  const flash = useRef(new Animated.Value(1)).current;
+  const expandHeight = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
   const [text, setText] = useState("");
   const [todos, setTodos] = useState([]);
   const [date, setDate] = useState(new Date());
@@ -24,6 +26,7 @@ export default function App() {
 
   const [editingId, setEditingId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
 
   const formatDate = (d) => {
     const y = d.getFullYear();
@@ -38,33 +41,24 @@ export default function App() {
     setDate(new Date(item.date));
     setPhoto(item.photos || null);
     setIsEditing(true);
-    scale.setValue(0);
-    Animated.spring(scale, {
-      toValue: 1,
-      friction: 4,
-      tension: 120,
-      useNativeDriver: true,
-    }).start();
-    flash.setValue(1);
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(flash, {
-          toValue: 0.5,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(flash, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
+    setModalVisible(true);
+    expandHeight.setValue(0);
+    fadeAnim.setValue(0);
+    Animated.parallel([
+      Animated.timing(expandHeight, {
+        toValue: 550,
+        duration: 300,
+        useNativeDriver: false,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   const saveEdit = () => {
-    flash.stopAnimation();
-    flash.setValue(1);
     setTodos(
       todos.map((todo) =>
         todo.id === editingId
@@ -105,8 +99,6 @@ export default function App() {
   };
 
   const addTodo = () => {
-    flash.stopAnimation();
-    flash.setValue(1);
     if (!text.trim()) return;
 
     const newTodo = {
@@ -171,19 +163,17 @@ export default function App() {
       {/* 미리보기 */}
       <View style={styles.previewBox}>
         {photo && (
-          <Animated.View style={{ opacity: flash }}>
-            <Image
-              source={{ uri: photo }}
-              style={{ width: 120, height: 120, borderRadius: 10 }}
-            />
-          </Animated.View>
+          <Image
+            source={{ uri: photo }}
+            style={{ width: 120, height: 120, borderRadius: 10 }}
+          />
         )}
       </View>
 
       {/* 추가 버튼 */}
       <Animated.View
         style={{
-          opacity: flash,
+          opacity: 1,
           width: "90%",
           alignItems: "center",
         }}
@@ -248,6 +238,62 @@ export default function App() {
           )}
         />
       </View>
+
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <View style={styles.modalBg}>
+          <Animated.View
+            style={[
+              styles.modalBox,
+              {
+                height: expandHeight,
+                opacity: fadeAnim,
+              },
+            ]}
+          >
+            <View style={{ padding: 20 }}>
+              <Text style={styles.modalTitle}>할 일 수정하기</Text>
+
+              <Pressable onPress={() => setShowPicker(true)}>
+                <Text style={styles.modalDate}>{formatDate(date)}</Text>
+              </Pressable>
+
+              {showPicker && (
+                <DateTimePicker
+                  value={date}
+                  mode="date"
+                  onChange={changeDate}
+                />
+              )}
+
+              <TextInput
+                style={styles.modalInput}
+                value={text}
+                onChangeText={setText}
+              />
+
+              {photo && (
+                <Image
+                  source={{ uri: photo }}
+                  style={{
+                    width: "100%",
+                    height: 200,
+                    borderRadius: 10,
+                    marginTop: 10,
+                  }}
+                />
+              )}
+
+              <Pressable style={styles.saveBtn} onPress={saveEdit}>
+                <Text style={styles.saveBtnText}>저장하기</Text>
+              </Pressable>
+
+              <Pressable onPress={() => setModalVisible(false)}>
+                <Text style={styles.closeText}>닫기</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -401,6 +447,58 @@ const styles = StyleSheet.create({
     marginTop: 30,
     fontSize: 20,
     color: "#666",
+    textAlign: "center",
+  },
+  modalBg: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modalBox: {
+    width: "85%",
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    overflow: "hidden", // 카드 펼침 애니메이션 핵심
+  },
+
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+
+  modalDate: {
+    fontSize: 17,
+    marginBottom: 10,
+  },
+
+  modalInput: {
+    width: "100%",
+    backgroundColor: "#f2f2f2",
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+
+  saveBtn: {
+    backgroundColor: "#4da6ff",
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 15,
+    alignItems: "center",
+  },
+  saveBtnText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+
+  closeText: {
+    color: "red",
+    fontSize: 16,
+    marginTop: 10,
     textAlign: "center",
   },
 });
