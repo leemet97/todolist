@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -13,6 +13,9 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const STORAGE_KEY = "MY_TODO_V1";
 
 export default function App() {
   const expandHeight = useRef(new Animated.Value(0)).current;
@@ -27,12 +30,34 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  useEffect(() => {
+    loadTodos();
+  }, []);
 
   const formatDate = (d) => {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
+  };
+
+  const saveTodos = async (item) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(item));
+    } catch (e) {
+      console.log("저장 중 오류", e);
+    }
+  };
+
+  const loadTodos = async () => {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEY);
+      if (data) {
+        setTodos(JSON.parse(data));
+      }
+    } catch (e) {
+      console.log("로드 오류", e);
+    }
   };
 
   const startEdit = (item) => {
@@ -53,19 +78,21 @@ export default function App() {
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start();
   };
 
   const saveEdit = () => {
-    setTodos(
-      todos.map((todo) =>
-        todo.id === editingId
-          ? { ...todo, title: text, date: formatDate(date), photos: photo }
-          : todo
-      )
+    const updated = todos.map((todo) =>
+      todo.id === editingId
+        ? { ...todo, title: text, date: formatDate(date), photos: photo }
+        : todo
     );
+
+    setTodos(updated);
+    saveTodos(updated);
+
     setEditingId(null);
     setIsEditing(false);
     setText("");
@@ -107,13 +134,18 @@ export default function App() {
       date: formatDate(date),
       photos: photo,
     };
-    setTodos([newTodo, ...todos]);
+    const updated = [newTodo, ...todos];
+
+    setTodos(updated);
+    saveTodos(updated);
     setText("");
     setPhoto(null);
   };
 
   const removetodo = (id) => {
-    setTodos(todos.filter((item) => item.id !== id));
+    const updated = todos.filter((item) => item.id !== id);
+    setTodos(updated);
+    saveTodos(updated);
   };
 
   const changeDate = (e, chDate) => {
